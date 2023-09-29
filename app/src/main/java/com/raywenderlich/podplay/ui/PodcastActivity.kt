@@ -3,51 +3,45 @@ package com.raywenderlich.podplay.ui
 import android.app.SearchManager
 import android.content.Context
 import android.os.Bundle
-import android.util.Log
 import android.view.Menu
-import androidx.activity.ComponentActivity
-import androidx.activity.compose.setContent
+import android.content.Intent
+import android.view.View
+import androidx.activity.viewModels
+import androidx.appcompat.app.AppCompatActivity
 import androidx.appcompat.widget.SearchView
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Surface
-import androidx.compose.material3.Text
-import androidx.compose.runtime.Composable
-import androidx.compose.ui.Modifier
-import androidx.compose.ui.tooling.preview.Preview
 import com.raywenderlich.podplay.R
+import com.raywenderlich.podplay.adapter.PodcastListAdapter
+import com.raywenderlich.podplay.databinding.ActivityPodcastBinding
 import com.raywenderlich.podplay.repository.ItunesRepo
 import com.raywenderlich.podplay.service.ItunesService
-import com.raywenderlich.podplay.ui.theme.PodPlayTheme
+import com.raywenderlich.podplay.viewmodel.SearchViewModel
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.GlobalScope
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
-class PodcastActivity : ComponentActivity() {
 
+
+
+
+class PodcastActivity : AppCompatActivity(),
+        PodcastListAdapter.PodcastListAdapterListener
+    {
+
+    private lateinit var binding: ActivityPodcastBinding
     val TAG = javaClass.simpleName
+    private val searchViewModel by viewModels<SearchViewModel>()
+    private lateinit var podcastListAdapter: PodcastListAdapter
+
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        setContent {
-            PodPlayTheme {
-                // A surface container using the 'background' color from the theme
-                Surface(
-                    modifier = Modifier.fillMaxSize(),
-                    color = MaterialTheme.colorScheme.background
-                ) {
-                    Greeting("Android")
-                }
-            }
-        }
-
-        val itunesService = ItunesService.instance
-        val itunesRepo = ItunesRepo(itunesService)
-
-        GlobalScope.launch {
-            val results = itunesRepo.searchByTerm("Android Developer")
-            Log.i(TAG, "Results = ${results.body()}")
-
-        }
+        binding = ActivityPodcastBinding.inflate(layoutInflater)
+        setContentView(binding.root)
+        setupToolbar()
+        setupViewModels()
+        updateControls()
+        handleIntent(intent)
     }
 
     override fun onCreateOptionsMenu(menu: Menu): Boolean {
@@ -63,19 +57,66 @@ class PodcastActivity : ComponentActivity() {
         return true
     }
 
-    @Composable
-    fun Greeting(name: String, modifier: Modifier = Modifier) {
-        Text(
-            text = "Hello $name!",
-            modifier = modifier
-        )
+    private fun setupToolbar() {
+        setSupportActionBar(binding.toolbar)
     }
 
-    @Preview(showBackground = true)
-    @Composable
-    fun GreetingPreview() {
-        PodPlayTheme {
-            Greeting("Android")
+        private fun performSearch(term: String) {
+            showProgressBar()
+            GlobalScope.launch {
+                val results = searchViewModel.searchPodcasts(term)
+                withContext(Dispatchers.Main) {
+                    hideProgressBar()
+                    databinding.toolbar.title = term
+                    podcastListAdapter.setSearchData(results)
+                } }
+        }
+
+        //Progress Bar
+    private fun showProgressBar() {
+        databinding.progressBar.visibility = View.VISIBLE
+    }
+    private fun hideProgressBar() {
+        databinding.progressBar.visibility = View.INVISIBLE
+    }
+
+    private fun handleIntent(intent: Intent) {
+        if (Intent.ACTION_SEARCH == intent.action) {
+            val query = intent.getStringExtra(SearchManager.QUERY) ?:
+        return
+            performSearch(query)
         }
     }
+
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        setIntent(intent)
+        handleIntent(intent)
+    }
+
+    private fun setupViewModels() {
+        val service = ItunesService.instance
+        searchViewModel.iTunesRepo = ItunesRepo(service)
+    }
+
+    private fun updateControls() {
+        databinding.podcastRecyclerView.setHasFixedSize(true)
+
+        val layoutManager = LinearLayoutManager(this)
+        databinding.podcastRecyclerView.layoutManager = layoutManager
+
+        val dividerItemDecoration = DividerItemDecoration(
+            databinding.podcastRecyclerView.context, layoutManager.orientation)
+
+        databinding.podcastRecyclerView.addItemDecoration(dividerItemDecoration)
+
+            podcastListAdapter = PodcastListAdapter(null, this, this)
+            databinding.podcastRecyclerView.adapter = podcastListAdapter
+    }
+    override fun onShowDetails(
+        podcastSummaryViewData: SearchViewModel.PodcastSummaryViewData
+    ) {
+            // Not implemented yet
+    }
+
 }
