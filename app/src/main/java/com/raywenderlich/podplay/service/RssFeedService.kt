@@ -3,12 +3,14 @@ package com.raywenderlich.podplay.service
 import com.raywenderlich.podplay.BuildConfig
 import okhttp3.OkHttpClient
 import okhttp3.ResponseBody
+import okhttp3.logging.HttpLoggingInterceptor
 import retrofit2.Response
 import retrofit2.Retrofit
 import retrofit2.http.GET
 import retrofit2.http.Headers
 import retrofit2.http.Url
 import java.util.concurrent.TimeUnit
+
 
 class RssFeedService private constructor() {
     suspend fun getFeed(xmlFileURL: String): RssFeedResponse? {
