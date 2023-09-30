@@ -19,6 +19,7 @@ import com.raywenderlich.podplay.databinding.ActivityPodcastBinding
 import com.raywenderlich.podplay.repository.ItunesRepo
 import com.raywenderlich.podplay.repository.PodcastRepo
 import com.raywenderlich.podplay.service.ItunesService
+import com.raywenderlich.podplay.service.RssFeedService
 import com.raywenderlich.podplay.viewmodel.PodcastViewModel
 import com.raywenderlich.podplay.viewmodel.SearchViewModel
 import kotlinx.coroutines.Dispatchers
@@ -30,12 +31,10 @@ import kotlinx.coroutines.withContext
 
 
 
-class PodcastActivity : AppCompatActivity(),
-        PodcastListAdapter.PodcastListAdapterListener
-    {
+class PodcastActivity : AppCompatActivity(), PodcastListAdapter.PodcastListAdapterListener {
+
     private lateinit var searchMenuItem: MenuItem
     private lateinit var databinding: ActivityPodcastBinding
-    val TAG = javaClass.simpleName
     private val searchViewModel by viewModels<SearchViewModel>()
     private lateinit var podcastListAdapter: PodcastListAdapter
     private val podcastViewModel by viewModels<PodcastViewModel>()
@@ -48,6 +47,7 @@ class PodcastActivity : AppCompatActivity(),
         setupToolbar()
         setupViewModels()
         updateControls()
+        createSubscription()
         handleIntent(intent)
         addBackStackListener()
     }
@@ -91,16 +91,17 @@ class PodcastActivity : AppCompatActivity(),
         setSupportActionBar(databinding.toolbar)
     }
 
-        private fun performSearch(term: String) {
-            showProgressBar()
-            GlobalScope.launch {
-                val results = searchViewModel.searchPodcasts(term)
-                withContext(Dispatchers.Main) {
-                    hideProgressBar()
-                    databinding.toolbar.title = term
-                    podcastListAdapter.setSearchData(results)
-                } }
+    private fun performSearch(term: String) {
+        showProgressBar()
+        GlobalScope.launch {
+            val results = searchViewModel.searchPodcasts(term)
+            withContext(Dispatchers.Main) {
+                hideProgressBar()
+                databinding.toolbar.title = term
+                podcastListAdapter.setSearchData(results)
+            }
         }
+    }
 
         //Progress Bar
     private fun showProgressBar() {
@@ -127,7 +128,7 @@ class PodcastActivity : AppCompatActivity(),
     private fun setupViewModels() {
         val service = ItunesService.instance
         searchViewModel.iTunesRepo = ItunesRepo(service)
-        podcastViewModel.podcastRepo = PodcastRepo()
+        podcastViewModel.podcastRepo = PodcastRepo(RssFeedService.instance)
     }
 
     private fun updateControls() {
@@ -145,45 +146,49 @@ class PodcastActivity : AppCompatActivity(),
             databinding.podcastRecyclerView.adapter = podcastListAdapter
     }
     override fun onShowDetails(podcastSummaryViewData: SearchViewModel.PodcastSummaryViewData) {
-
-        val feedUrl = podcastSummaryViewData.feedUrl ?: return
-        showProgressBar()
-        val podcast = podcastViewModel.getPodcast(podcastSummaryViewData)
-
-        hideProgressBar()
-        if (podcast != null) {
-            showDetailsFragment()
-        } else {
-            showError("Error loading feed $feedUrl")
+        podcastSummaryViewData.feedUrl?.let {
+            showProgressBar()
+            podcastViewModel.getPodcast(podcastSummaryViewData)
         }
     }
 
-        private fun createPodcastDetailsFragment(): PodcastDetailsFragment {
-
-            var podcastDetailsFragment = supportFragmentManager
-                .findFragmentByTag(TAG_DETAILS_FRAGMENT) as PodcastDetailsFragment?
-
-            if (podcastDetailsFragment == null) {
-                podcastDetailsFragment = PodcastDetailsFragment.newInstance()
-            }
-            return podcastDetailsFragment
-        }
-
-        private fun showError(message: String) {
-            AlertDialog.Builder(this)
-                .setMessage(message)
-                .setPositiveButton(getString(R.string.ok_button), null)
-                .create()
-                .show()
-        }
-
-        private fun addBackStackListener() {
-            supportFragmentManager.addOnBackStackChangedListener {
-                if (supportFragmentManager.backStackEntryCount == 0) {
-                    databinding.podcastRecyclerView.visibility = View.VISIBLE
-                }
+    private fun createSubscription() {
+        podcastViewModel.podcastLiveData.observe(this) {
+            hideProgressBar()
+            if (it != null) {
+                showDetailsFragment()
+            } else {
+                showError("Error loading feed")
             }
         }
+    }
+
+    private fun createPodcastDetailsFragment(): PodcastDetailsFragment {
+
+        var podcastDetailsFragment = supportFragmentManager
+            .findFragmentByTag(TAG_DETAILS_FRAGMENT) as PodcastDetailsFragment?
+
+        if (podcastDetailsFragment == null) {
+            podcastDetailsFragment = PodcastDetailsFragment.newInstance()
+        }
+        return podcastDetailsFragment
+    }
+
+    private fun showError(message: String) {
+        AlertDialog.Builder(this)
+            .setMessage(message)
+            .setPositiveButton(getString(R.string.ok_button), null)
+            .create()
+            .show()
+    }
+
+    private fun addBackStackListener() {
+        supportFragmentManager.addOnBackStackChangedListener {
+            if (supportFragmentManager.backStackEntryCount == 0) {
+                databinding.podcastRecyclerView.visibility = View.VISIBLE
+            }
+        }
+    }
 
 
     companion object {
