@@ -36,8 +36,8 @@ class PodcastActivity : AppCompatActivity(),
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        binding = ActivityPodcastBinding.inflate(layoutInflater)
-        setContentView(binding.root)
+        databinding = ActivityPodcastBinding.inflate(layoutInflater)
+        setContentView(databinding.root)
         setupToolbar()
         setupViewModels()
         updateControls()
@@ -58,7 +58,7 @@ class PodcastActivity : AppCompatActivity(),
     }
 
     private fun setupToolbar() {
-        setSupportActionBar(binding.toolbar)
+        setSupportActionBar(databinding.toolbar)
     }
 
         private fun performSearch(term: String) {
